@@ -1,0 +1,5 @@
+# Everything needed to run the test-suite locally (no Docker required).
+-r controller/requirements.txt
+-r worker/requirements.txt
+pytest>=8
+anyio>=4

@@ -1,0 +1,11 @@
+[project]
+name = "mini-distributed-object-store"
+version = "1.0.0"
+description = "Mini Distributed Cloud Object Store: 1 controller, 4 workers, 1 MB chunks, replication factor 2"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["controller", "worker", "client", "tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]
