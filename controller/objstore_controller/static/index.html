@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Object Store Dashboard</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --text:#1d2330; --muted:#677084; --line:#e3e6ec;
+          --ok:#1a7f4b; --warn:#a15c00; --bad:#b42318; --accent:#2f5bd3; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--text); }
+  header { padding:16px 24px; background:var(--card); border-bottom:1px solid var(--line); display:flex; align-items:center; gap:16px; }
+  header h1 { font-size:18px; margin:0; }
+  header .sub { color:var(--muted); }
+  main { padding:20px 24px; display:grid; gap:20px; grid-template-columns: 1fr 1fr; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; min-width:0; }
+  section.wide { grid-column: 1 / -1; }
+  h2 { font-size:15px; margin:0 0 12px; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.03em; }
+  td.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:10px; font-size:12px; font-weight:600; }
+  .UP, .healthy { background:#e3f5ea; color:var(--ok); }
+  .SYNCING, .degraded { background:#fff2db; color:var(--warn); }
+  .DOWN, .corrupt, .unavailable { background:#fde7e6; color:var(--bad); }
+  .stats { display:grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap:10px; }
+  .stat { border:1px solid var(--line); border-radius:6px; padding:10px; }
+  .stat .v { font-size:20px; font-weight:600; }
+  .stat .k { color:var(--muted); font-size:12px; }
+  button, input[type=submit] { background:var(--accent); color:#fff; border:0; border-radius:5px; padding:6px 12px; cursor:pointer; font:inherit; }
+  button.secondary { background:#e8ecf6; color:var(--accent); }
+  button.danger { background:#fde7e6; color:var(--bad); }
+  form { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+  input[type=text] { padding:6px 8px; border:1px solid var(--line); border-radius:5px; font:inherit; min-width:260px; }
+  .muted { color:var(--muted); }
+  .events { max-height:360px; overflow:auto; }
+  .lvl-error { color:var(--bad); } .lvl-warning { color:var(--warn); }
+  #placement { margin-top:12px; }
+  @media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Mini Distributed Cloud Object Store</h1>
+  <span class="sub" id="summary">loading…</span>
+  <span style="flex:1"></span>
+  <button class="secondary" onclick="admin('scrub')">Scrub now</button>
+  <button class="secondary" onclick="admin('repair')">Repair now</button>
+  <a href="/docs" class="muted">API docs</a>
+</header>
+<main>
+  <section class="wide">
+    <h2>Replication health</h2>
+    <div class="stats" id="stats"></div>
+  </section>
+
+  <section>
+    <h2>Workers</h2>
+    <table><thead><tr><th>Worker</th><th>Status</th><th>Last heartbeat</th><th>Copies</th><th>Used</th></tr></thead>
+      <tbody id="workers"></tbody></table>
+  </section>
+
+  <section>
+    <h2>Events</h2>
+    <div class="events"><table><tbody id="events"></tbody></table></div>
+  </section>
+
+  <section class="wide">
+    <h2>Objects</h2>
+    <form id="upload">
+      <input type="file" name="file" required>
+      <input type="text" name="metadata" placeholder='custom metadata JSON, e.g. {"owner":"alice"}'>
+      <input type="submit" value="Upload">
+      <span id="upload-status" class="muted"></span>
+    </form>
+    <table><thead><tr><th>Name</th><th>Object ID</th><th>Size</th><th>Type</th><th>Chunks</th><th>Created</th><th></th></tr></thead>
+      <tbody id="objects"></tbody></table>
+    <div id="placement"></div>
+  </section>
+</main>
+<script>
+const api = (p, opts) => fetch(p, opts).then(async r => {
+  if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(b.error ? b.error.message : r.statusText); }
+  return r.status === 204 ? null : r.json();
+});
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const human = n => { const u = ['B','KB','MB','GB','TB']; let i = 0; n = Number(n);
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; } return (i ? n.toFixed(2) : n) + ' ' + u[i]; };
+const pill = s => `<span class="pill ${esc(s)}">${esc(s)}</span>`;
+let selected = null;
+
+async function refresh() {
+  try {
+    const [c, objs, events] = await Promise.all([api('/api/v1/cluster'), api('/api/v1/objects?limit=200'), api('/api/v1/events?limit=60')]);
+    document.getElementById('summary').textContent =
+      `RF=${c.replication_factor} · chunk ${human(c.chunk_size)} · ${c.workers_up}/${c.workers_total} workers UP · ` +
+      (c.replication_healthy ? 'replication healthy' : 'replication NOT healthy');
+    const stats = [['Objects', c.objects], ['Stored', human(c.stored_bytes)], ['Chunks', c.chunks], ['Copies', c.replicas],
+      ['Fully replicated', c.fully_replicated], ['Under-replicated', c.under_replicated], ['Unavailable', c.unavailable],
+      ['Over-replicated', c.over_replicated], ['Corrupt copies', c.corrupt_replicas], ['Pending deletes', c.pending_deletes]];
+    document.getElementById('stats').innerHTML = stats.map(([k, v]) => `<div class="stat"><div class="v">${esc(v)}</div><div class="k">${k}</div></div>`).join('');
+    document.getElementById('workers').innerHTML = c.workers.map(w =>
+      `<tr><td class="mono">${esc(w.worker_id)}</td><td>${pill(w.status)}</td><td>${w.seconds_since_heartbeat}s ago</td>` +
+      `<td>${w.replicas_recorded}</td><td>${human(w.used_bytes)}</td></tr>`).join('');
+    document.getElementById('events').innerHTML = events.map(e =>
+      `<tr><td class="mono muted">${esc(e.time.slice(11, 19))}</td><td class="lvl-${esc(e.level)}">${esc(e.type)}</td><td>${esc(e.message)}</td></tr>`).join('');
+    document.getElementById('objects').innerHTML = objs.objects.map(o =>
+      `<tr><td>${esc(o.name)}</td><td class="mono">${esc(o.object_id)}</td><td>${human(o.size)}</td><td>${esc(o.content_type)}</td>` +
+      `<td>${o.num_chunks}</td><td class="muted">${esc(o.created_at.slice(0, 19))}</td>` +
+      `<td><button class="secondary" onclick="show('${o.object_id}')">Placement</button> ` +
+      `<a href="/api/v1/objects/${o.object_id}"><button class="secondary">Download</button></a> ` +
+      `<button class="danger" onclick="del('${o.object_id}')">Delete</button></td></tr>`).join('') ||
+      '<tr><td colspan="7" class="muted">No objects yet — upload one above.</td></tr>';
+    if (selected) await show(selected, true);
+  } catch (e) { document.getElementById('summary').textContent = 'error: ' + e.message; }
+}
+
+async function show(id, quiet) {
+  selected = id;
+  try {
+    const m = await api(`/api/v1/objects/${id}/metadata`);
+    const rows = m.chunks.map(ch => `<tr><td>${ch.index}</td><td class="mono">${esc(ch.chunk_id)}</td><td>${human(ch.size)}</td>` +
+      `<td class="mono">${ch.checksum.slice(0, 16)}…</td><td>${ch.healthy_replicas}/${m.replication_factor}</td><td>` +
+      ch.replicas.map(r => `<span class="mono">${esc(r.worker_id)}</span> ${pill(r.available ? 'healthy' : (r.status === 'corrupt' ? 'corrupt' : r.worker_status))}`).join(' &nbsp; ') +
+      `</td></tr>`).join('');
+    document.getElementById('placement').innerHTML =
+      `<h2>${esc(m.name)} — ${pill(m.replication_status)} <button class="secondary" onclick="selected=null;this.closest('div').innerHTML=''">close</button></h2>` +
+      `<p class="muted mono">sha256 ${esc(m.checksum)} · custom metadata ${esc(JSON.stringify(m.custom_metadata))} (v${m.metadata_version})</p>` +
+      `<table><thead><tr><th>#</th><th>Chunk</th><th>Size</th><th>SHA-256</th><th>Copies</th><th>Workers</th></tr></thead><tbody>${rows}</tbody></table>`;
+  } catch (e) { selected = null; if (!quiet) alert(e.message); document.getElementById('placement').innerHTML = ''; }
+}
+
+async function del(id) {
+  if (!confirm('Delete object ' + id + '?')) return;
+  try { await api(`/api/v1/objects/${id}`, {method: 'DELETE'}); if (selected === id) selected = null; refresh(); }
+  catch (e) { alert(e.message); }
+}
+
+async function admin(action) {
+  try { const r = await api(`/api/v1/admin/${action}`, {method: 'POST'}); console.log(action, r); refresh(); }
+  catch (e) { alert(e.message); }
+}
+
+document.getElementById('upload').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const form = new FormData(ev.target);
+  if (!form.get('metadata')) form.delete('metadata');
+  const status = document.getElementById('upload-status');
+  status.textContent = 'uploading…';
+  try { const m = await api('/api/v1/objects', {method: 'POST', body: form}); status.textContent = 'stored ' + m.object_id; ev.target.reset(); show(m.object_id); refresh(); }
+  catch (e) { status.textContent = 'error: ' + e.message; }
+});
+
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>
