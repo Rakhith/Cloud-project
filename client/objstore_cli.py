@@ -25,6 +25,7 @@ Add ``--json`` (before the command) for raw JSON output.
 from __future__ import annotations
 
 import argparse
+from email.message import Message
 import hashlib
 import json
 import mimetypes
@@ -121,7 +122,7 @@ class Client:
         with self._open("POST", "/api/v1/objects", body(), headers) as resp:
             return json.loads(resp.read())
 
-    def download(self, object_id: str, out) -> tuple[int, str, dict]:
+    def download(self, object_id: str, out) -> tuple[int, str, Message]:
         """Stream an object into ``out``; returns (bytes, sha256, headers)."""
         hasher = hashlib.sha256()
         total = 0
@@ -130,7 +131,7 @@ class Client:
                 hasher.update(block)
                 out.write(block)
                 total += len(block)
-            return total, hasher.hexdigest(), dict(resp.headers)
+            return total, hasher.hexdigest(), resp.headers
 
 
 # ---------------------------------------------------------------------- formatting
