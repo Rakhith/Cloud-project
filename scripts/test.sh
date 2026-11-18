@@ -35,7 +35,7 @@ esac
 if [ -z "$PYTHON_BIN" ]; then
   # Match the Docker images.  Prefer a supported interpreter instead of a
   # system `python3` that may point to a newer, unsupported development build.
-  for candidate in python3.12 python3.11 python3.10 python3; do
+  for candidate in python3.13 python3.12 python3.11 python3.10 python3; do
     if command -v "$candidate" >/dev/null 2>&1; then
       PYTHON_BIN=$candidate
       break
@@ -44,7 +44,7 @@ if [ -z "$PYTHON_BIN" ]; then
 fi
 
 if [ -z "$PYTHON_BIN" ]; then
-  echo "Python 3.10, 3.11, or 3.12 is required to create the test environment." >&2
+  echo "Python 3.10, 3.11, 3.12, or 3.13 is required to create the test environment." >&2
   exit 1
 fi
 
