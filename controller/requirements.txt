@@ -1,5 +1,9 @@
-fastapi>=0.110,<1.0
-uvicorn[standard]>=0.29
-httpx>=0.27,<1.0
-python-multipart>=0.0.9
-pydantic>=2.6,<3
+# Keep FastAPI and Starlette compatible.  FastAPI 0.110.x requires
+# Starlette >=0.36.3,<0.37.0; an unpinned global Starlette 1.x prevents the
+# application (and pytest) from importing.
+fastapi==0.110.0
+starlette==0.36.3
+uvicorn[standard]==0.29.0
+httpx==0.28.1
+python-multipart==0.0.9
+pydantic==2.6.4

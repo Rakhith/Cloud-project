@@ -1,7 +1,7 @@
 # Convenience targets. Everything also works with plain docker compose.
 COMPOSE ?= docker compose
 
-.PHONY: help build up down logs ps demo demo-failure demo-integrity test local-up local-down clean
+.PHONY: help build up down logs ps demo demo-failure demo-integrity test test-api test-failures test-integrity test-worker test-cli local-up local-down clean
 
 help:          ## show this help
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
@@ -32,7 +32,22 @@ demo-integrity: ## only the data-integrity demonstration
 	scripts/demo.sh integrity
 
 test:          ## run the automated test-suite (no Docker needed)
-	python3 -m pytest
+	scripts/test.sh
+
+test-api:      ## run client REST API and metadata tests
+	scripts/test.sh api
+
+test-failures: ## run worker failure and automatic-repair tests
+	scripts/test.sh failures
+
+test-integrity: ## run corruption detection and restoration tests
+	scripts/test.sh integrity
+
+test-worker:   ## run worker persistent-storage tests
+	scripts/test.sh worker
+
+test-cli:      ## run command-line client tests
+	scripts/test.sh cli
 
 local-up:      ## run the cluster as local processes instead of containers
 	scripts/local_cluster.sh up

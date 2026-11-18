@@ -226,9 +226,9 @@ docs/                           architecture and demo guides
 The test suite starts a full cluster (controller + 4 workers) **in-process**. The nodes talk over a simulated network that can make a worker unreachable, so failure and corruption scenarios run in seconds without Docker:
 
 ```bash
-python3 -m venv .venv && . .venv/bin/activate
-pip install -r requirements-dev.txt
-pytest                                   # 50 tests
+scripts/test.sh                          # creates .venv and runs all tests
+make test-integrity                      # run only the corruption tests
+make test-failures                       # run only worker-stop/restart tests
 ```
 
 To run the real services without Docker (ports 8080 and 9001–9004; set `CONTROLLER_PORT` to change the controller port):
