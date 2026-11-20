@@ -49,6 +49,8 @@ scripts/demo.sh            # or: make demo
 * Interactive API docs (OpenAPI/Swagger): <http://localhost:8080/docs>
 * Live dashboard with workers, replication health, chunk placement, events and uploads: <http://localhost:8080/>
 
+The dashboard refreshes automatically and includes a controller-to-worker topology, per-worker heartbeat and storage details, replication health counters, a searchable object list, chunk-by-chunk replica locations, and a live event timeline. Upload a file from the page to watch placement update, or use **Run integrity scrub** and **Repair replication** during a demo.
+
 If port 8080 is already in use, start with `CONTROLLER_PORT=18080 docker compose up -d` and `export OBJSTORE_URL=http://localhost:18080`.
 
 Stop the cluster with `docker compose down`. Data is kept in volumes; `docker compose down -v` deletes it.

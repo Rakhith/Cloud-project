@@ -3,153 +3,541 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Object Store Dashboard</title>
+<meta name="theme-color" content="#101923">
+<title>Object Store · Live Cluster</title>
 <style>
-  :root { --bg:#f6f7f9; --card:#fff; --text:#1d2330; --muted:#677084; --line:#e3e6ec;
-          --ok:#1a7f4b; --warn:#a15c00; --bad:#b42318; --accent:#2f5bd3; }
+  :root {
+    color-scheme: dark;
+    --bg: #101923;
+    --panel: #182430;
+    --panel-raised: #1d2b38;
+    --line: #2a3a48;
+    --text: #e8eff4;
+    --muted: #91a2af;
+    --green: #64d5a1;
+    --amber: #f0bc65;
+    --red: #fb7777;
+    --blue: #79b8ff;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font: 14px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
   * { box-sizing: border-box; }
-  body { margin:0; font:14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--text); }
-  header { padding:16px 24px; background:var(--card); border-bottom:1px solid var(--line); display:flex; align-items:center; gap:16px; }
-  header h1 { font-size:18px; margin:0; }
-  header .sub { color:var(--muted); }
-  main { padding:20px 24px; display:grid; gap:20px; grid-template-columns: 1fr 1fr; }
-  section { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; min-width:0; }
-  section.wide { grid-column: 1 / -1; }
-  h2 { font-size:15px; margin:0 0 12px; }
-  table { width:100%; border-collapse:collapse; }
-  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
-  th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.03em; }
-  td.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; }
-  .pill { display:inline-block; padding:1px 8px; border-radius:10px; font-size:12px; font-weight:600; }
-  .UP, .healthy { background:#e3f5ea; color:var(--ok); }
-  .SYNCING, .degraded { background:#fff2db; color:var(--warn); }
-  .DOWN, .corrupt, .unavailable { background:#fde7e6; color:var(--bad); }
-  .stats { display:grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap:10px; }
-  .stat { border:1px solid var(--line); border-radius:6px; padding:10px; }
-  .stat .v { font-size:20px; font-weight:600; }
-  .stat .k { color:var(--muted); font-size:12px; }
-  button, input[type=submit] { background:var(--accent); color:#fff; border:0; border-radius:5px; padding:6px 12px; cursor:pointer; font:inherit; }
-  button.secondary { background:#e8ecf6; color:var(--accent); }
-  button.danger { background:#fde7e6; color:var(--bad); }
-  form { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
-  input[type=text] { padding:6px 8px; border:1px solid var(--line); border-radius:5px; font:inherit; min-width:260px; }
-  .muted { color:var(--muted); }
-  .events { max-height:360px; overflow:auto; }
-  .lvl-error { color:var(--bad); } .lvl-warning { color:var(--warn); }
-  #placement { margin-top:12px; }
-  @media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
+  body { margin: 0; background: var(--bg); color: var(--text); }
+  button, input { font: inherit; }
+  button, .button {
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    min-height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px;
+    background: var(--panel-raised); color: var(--text); cursor: pointer; text-decoration: none;
+    transition: border-color .15s, background .15s, transform .15s;
+  }
+  button:hover, .button:hover { border-color: #52718a; background: #243746; }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .55; cursor: wait; }
+  button.primary { background: #245b50; border-color: #347b69; color: #d8fff0; }
+  button.danger { color: #ffaaaa; border-color: #633d45; background: #36272e; }
+  button.small { min-height: 29px; padding: 4px 9px; font-size: 12px; }
+  a { color: var(--blue); }
+  .mono { font-family: var(--mono); }
+  .muted { color: var(--muted); }
+  .topbar {
+    display: flex; align-items: center; gap: 16px; padding: 15px clamp(16px, 4vw, 48px);
+    border-bottom: 1px solid var(--line); background: #141f2a;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .brand-mark {
+    display: grid; width: 38px; height: 38px; place-items: center; border: 1px solid #347b69;
+    border-radius: 11px; color: var(--green); background: #1b392f; font-size: 19px;
+  }
+  h1 { margin: 0; font-size: 16px; letter-spacing: -.02em; }
+  .subtitle { color: var(--muted); font-size: 12px; }
+  .topbar-spacer { flex: 1; }
+  .live-indicator { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 12px #64d5a177; }
+  .dot.offline { background: var(--red); box-shadow: 0 0 12px #fb777777; }
+  main { width: min(1440px, 100%); margin: 0 auto; padding: 26px clamp(16px, 4vw, 48px) 48px; }
+  .intro { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 20px; }
+  .eyebrow { margin: 0 0 5px; color: var(--green); font-size: 11px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
+  .intro h2 { margin: 0; font-size: clamp(22px, 3vw, 30px); letter-spacing: -.04em; }
+  .intro p { margin: 6px 0 0; color: var(--muted); }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .section {
+    margin-top: 16px; border: 1px solid var(--line); border-radius: 13px;
+    min-width: 0; background: var(--panel); overflow: hidden;
+  }
+  .section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 17px 19px 13px; }
+  .section-head > div { min-width: 0; }
+  .section-head h3 { margin: 0; font-size: 14px; letter-spacing: -.01em; }
+  .section-head p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+  .health-label { display: inline-flex; align-items: center; gap: 7px; color: var(--green); font-size: 12px; font-weight: 700; }
+  .health-label.warn { color: var(--amber); }
+  .stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; padding: 0 19px 19px; }
+  .stat { min-width: 0; padding: 13px; border: 1px solid var(--line); border-radius: 10px; background: #14202a; }
+  .stat .value { overflow: hidden; color: var(--text); font-size: clamp(17px, 2vw, 23px); font-weight: 700; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -.03em; }
+  .stat .label { margin-top: 2px; color: var(--muted); font-size: 11px; }
+  .stat.attention .value { color: var(--amber); }
+  .topology { display: grid; grid-template-columns: minmax(190px, .7fr) minmax(0, 2fr); gap: 17px; padding: 4px 19px 19px; }
+  .controller-node, .worker-node {
+    border: 1px solid var(--line); border-radius: 10px; background: #14202a;
+  }
+  .controller-node { align-self: center; padding: 16px; }
+  .node-head { display: flex; align-items: center; gap: 10px; }
+  .node-icon { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; border-radius: 9px; color: var(--blue); background: #20374a; font-weight: 700; }
+  .node-title { font-weight: 700; }
+  .node-subtitle { color: var(--muted); font-size: 11px; }
+  .node-points { display: grid; gap: 7px; margin-top: 14px; color: var(--muted); font-size: 11px; }
+  .node-points span::before { content: "•"; margin-right: 7px; color: var(--green); }
+  .worker-flows { display: grid; gap: 9px; }
+  .worker-flow { display: grid; grid-template-columns: minmax(35px, .55fr) minmax(0, 2fr); align-items: center; gap: 12px; min-width: 0; }
+  .flow-line { position: relative; height: 2px; background: var(--green); opacity: .65; }
+  .flow-line::after { position: absolute; top: -4px; right: 0; width: 8px; height: 8px; border-top: 2px solid currentColor; border-right: 2px solid currentColor; color: var(--green); content: ""; transform: rotate(45deg); }
+  .worker-flow.SYNCING .flow-line { background: var(--amber); }
+  .worker-flow.SYNCING .flow-line::after { color: var(--amber); }
+  .worker-flow.DOWN .flow-line { background: var(--red); opacity: .8; }
+  .worker-flow.DOWN .flow-line::after { color: var(--red); }
+  .worker-node { display: grid; grid-template-columns: minmax(100px, 1.15fr) minmax(92px, .9fr) minmax(110px, 1fr); align-items: center; gap: 12px; padding: 10px 12px; }
+  .worker-id { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .worker-id strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .status-dot { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: var(--green); }
+  .status-dot.SYNCING { background: var(--amber); }
+  .status-dot.DOWN { background: var(--red); }
+  .worker-metrics { color: var(--muted); font-size: 11px; }
+  .worker-metrics b { color: var(--text); font-family: var(--mono); font-weight: 500; }
+  .storage-track { height: 5px; margin-top: 5px; overflow: hidden; border-radius: 5px; background: #2a3945; }
+  .storage-track span { display: block; min-width: 2px; height: 100%; border-radius: inherit; background: var(--blue); }
+  .worker-focus { color: var(--green); font-size: 11px; text-align: right; }
+  .worker-focus.empty { color: var(--muted); }
+  .lower-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(300px, .8fr); gap: 16px; align-items: start; }
+  .object-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0 19px 14px; }
+  input[type="search"], input[type="text"] {
+    min-height: 36px; border: 1px solid var(--line); border-radius: 8px; outline: none;
+    padding: 7px 10px; background: #111c25; color: var(--text);
+  }
+  input:focus { border-color: #5685a7; box-shadow: 0 0 0 3px #79b8ff1c; }
+  input[type="search"] { width: min(280px, 100%); }
+  input[type="text"] { min-width: min(240px, 100%); flex: 1; }
+  input[type="file"] { max-width: 100%; color: var(--muted); font-size: 12px; }
+  input[type="file"]::file-selector-button { margin-right: 9px; border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px; background: #20303d; color: var(--text); cursor: pointer; }
+  .upload-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; }
+  .upload-form input[type="file"] { flex: 1 1 160px; }
+  .table-wrap { width: 100%; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 10px 12px; border-top: 1px solid var(--line); text-align: left; vertical-align: middle; }
+  th { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+  td { font-size: 12px; }
+  td.mono { font-size: 11px; }
+  .object-name { max-width: 190px; overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+  .object-id { max-width: 150px; overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
+  .row-actions { display: flex; gap: 5px; }
+  .pill { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; color: var(--muted); font-size: 10px; font-weight: 700; white-space: nowrap; }
+  .pill.healthy, .pill.UP { border-color: #31614f; color: var(--green); background: #1b342c; }
+  .pill.SYNCING, .pill.degraded, .pill.warning { border-color: #665438; color: var(--amber); background: #352e21; }
+  .pill.DOWN, .pill.corrupt, .pill.unavailable, .pill.error { border-color: #694047; color: var(--red); background: #39262d; }
+  .events-list { max-height: 530px; overflow: auto; padding: 0 16px 10px; }
+  .event { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 10px; padding: 11px 3px; border-top: 1px solid var(--line); }
+  .event-time { color: var(--muted); font: 10px var(--mono); padding-top: 2px; }
+  .event-type { color: var(--blue); font: 700 10px var(--mono); }
+  .event.warning .event-type { color: var(--amber); }
+  .event.error .event-type { color: var(--red); }
+  .event-message { margin-top: 3px; color: #c4d0d9; font-size: 12px; overflow-wrap: anywhere; }
+  .event-details { margin-top: 6px; color: var(--muted); font-size: 10px; }
+  .event-details summary { width: fit-content; cursor: pointer; }
+  .event-details pre { max-height: 180px; overflow: auto; margin: 6px 0 0; border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: #101923; color: #c4d0d9; font: 10px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .event-empty { padding: 18px 4px; color: var(--muted); font-size: 12px; }
+  #placement { margin: 0 19px 19px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: #14202a; }
+  #placement:empty { display: none; }
+  .placement-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+  .placement-heading h4 { margin: 0; font-size: 13px; }
+  .placement-meta { margin: 5px 0 12px; color: var(--muted); font: 10px/1.5 var(--mono); overflow-wrap: anywhere; }
+  .copy-cell { min-width: 180px; }
+  .copy-worker { display: inline-flex; align-items: center; gap: 5px; margin: 2px 8px 2px 0; }
+  .toast { position: fixed; right: 18px; bottom: 18px; z-index: 3; max-width: min(430px, calc(100vw - 36px)); border: 1px solid var(--line); border-radius: 9px; padding: 11px 14px; background: #20303d; box-shadow: 0 12px 40px #0006; }
+  .toast.error { border-color: #694047; color: #ffb4b4; }
+  .toast:empty { display: none; }
+  .footer { margin-top: 14px; color: var(--muted); font-size: 11px; text-align: right; }
+  @media (max-width: 980px) {
+    .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .lower-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 650px) {
+    .topbar { flex-wrap: wrap; }
+    .live-indicator { margin-left: auto; }
+    .topbar-spacer { display: none; }
+    main { padding-top: 20px; }
+    .intro { align-items: start; flex-direction: column; }
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-right: 13px; padding-left: 13px; }
+    .section-head { padding-right: 13px; padding-left: 13px; }
+    #rf-label { max-width: 120px; text-align: right; white-space: normal; }
+    .topology { grid-template-columns: 1fr; padding-right: 13px; padding-left: 13px; }
+    .controller-node { align-self: auto; }
+    .worker-flow { grid-template-columns: 18px minmax(0, 1fr); gap: 8px; }
+    .flow-line { width: 2px; height: 20px; justify-self: center; }
+    .flow-line::after { top: auto; right: -3px; bottom: 0; transform: rotate(135deg); }
+    .worker-node { grid-template-columns: minmax(0, 1fr) minmax(95px, .8fr); }
+    .worker-focus { grid-column: 2; grid-row: 1; }
+    .worker-metrics.storage { grid-column: 1 / -1; }
+    .object-tools { padding-right: 13px; padding-left: 13px; }
+    #placement { margin-right: 13px; margin-left: 13px; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
 </style>
 </head>
 <body>
-<header>
-  <h1>Mini Distributed Cloud Object Store</h1>
-  <span class="sub" id="summary">loading…</span>
-  <span style="flex:1"></span>
-  <button class="secondary" onclick="admin('scrub')">Scrub now</button>
-  <button class="secondary" onclick="admin('repair')">Repair now</button>
-  <a href="/docs" class="muted">API docs</a>
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark" aria-hidden="true">◈</div>
+    <div><h1>Mini Distributed Object Store</h1><div class="subtitle">Cluster observability</div></div>
+  </div>
+  <span class="topbar-spacer"></span>
+  <span class="live-indicator"><span class="dot" id="live-dot"></span><span id="live-text">Connecting…</span></span>
+  <button class="small" id="refresh-button" type="button">↻ Refresh</button>
+  <a class="button small" href="/docs">API docs ↗</a>
 </header>
+
 <main>
-  <section class="wide">
-    <h2>Replication health</h2>
-    <div class="stats" id="stats"></div>
+  <div class="intro">
+    <div>
+      <p class="eyebrow">Live system view</p>
+      <h2>See the cluster at a glance.</h2>
+      <p id="summary">Connecting to the controller…</p>
+    </div>
+    <div class="actions">
+      <button class="small" id="scrub-button" type="button">◎ Run integrity scrub</button>
+      <button class="small primary" id="repair-button" type="button">↻ Repair replication</button>
+    </div>
+  </div>
+
+  <section class="section" aria-labelledby="health-title">
+    <div class="section-head">
+      <div><h3 id="health-title">System health</h3><p>Replication and storage totals, refreshed every 2 seconds</p></div>
+      <span class="health-label" id="health-label"><span class="dot"></span>Checking</span>
+    </div>
+    <div class="stats" id="stats" aria-live="polite"></div>
   </section>
 
-  <section>
-    <h2>Workers</h2>
-    <table><thead><tr><th>Worker</th><th>Status</th><th>Last heartbeat</th><th>Copies</th><th>Used</th></tr></thead>
-      <tbody id="workers"></tbody></table>
+  <section class="section" aria-labelledby="topology-title">
+    <div class="section-head">
+      <div><h3 id="topology-title">How data flows</h3><p>Controller coordinates chunk writes, reads, heartbeats, and repair across workers</p></div>
+      <span class="pill" id="rf-label">RF = —</span>
+    </div>
+    <div class="topology">
+      <div class="controller-node">
+        <div class="node-head">
+          <div class="node-icon" aria-hidden="true">C</div>
+          <div><div class="node-title">Controller</div><div class="node-subtitle">REST API · metadata · placement</div></div>
+        </div>
+        <div class="node-points">
+          <span id="controller-objects">Objects —</span>
+          <span>SQLite metadata store</span>
+          <span>Heartbeat &amp; repair loop</span>
+        </div>
+      </div>
+      <div class="worker-flows" id="worker-flows" aria-label="Controller connections to storage workers"></div>
+    </div>
   </section>
 
-  <section>
-    <h2>Events</h2>
-    <div class="events"><table><tbody id="events"></tbody></table></div>
-  </section>
+  <div class="lower-grid">
+    <section class="section" aria-labelledby="objects-title">
+      <div class="section-head">
+        <div><h3 id="objects-title">Objects &amp; chunk placement</h3><p>Upload an object, inspect its chunks, or download the original</p></div>
+      </div>
+      <div class="object-tools">
+        <form class="upload-form" id="upload">
+          <input type="file" name="file" aria-label="Choose file to upload" required>
+          <input type="text" name="metadata" aria-label="Optional custom metadata" placeholder='Metadata JSON, e.g. {"owner":"alice"}'>
+          <button type="submit" class="primary">↑ Upload object</button>
+        </form>
+        <input id="object-search" type="search" placeholder="Filter objects by name or ID…" aria-label="Filter objects">
+        <span id="upload-status" class="muted" role="status"></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Object</th><th>Size</th><th>Chunks</th><th>Health</th><th>Actions</th></tr></thead>
+          <tbody id="objects"></tbody>
+        </table>
+      </div>
+      <div id="placement"></div>
+    </section>
 
-  <section class="wide">
-    <h2>Objects</h2>
-    <form id="upload">
-      <input type="file" name="file" required>
-      <input type="text" name="metadata" placeholder='custom metadata JSON, e.g. {"owner":"alice"}'>
-      <input type="submit" value="Upload">
-      <span id="upload-status" class="muted"></span>
-    </form>
-    <table><thead><tr><th>Name</th><th>Object ID</th><th>Size</th><th>Type</th><th>Chunks</th><th>Created</th><th></th></tr></thead>
-      <tbody id="objects"></tbody></table>
-    <div id="placement"></div>
-  </section>
+    <section class="section" aria-labelledby="events-title">
+      <div class="section-head">
+        <div><h3 id="events-title">Recent activity</h3><p>Worker lifecycle, replication, and integrity events</p></div>
+        <span class="pill" id="event-count">0 events</span>
+      </div>
+      <div class="events-list" id="events" aria-live="polite"></div>
+    </section>
+  </div>
+
+  <div class="footer">Auto-refreshing · <span id="updated-at">Waiting for first update</span></div>
 </main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
 <script>
-const api = (p, opts) => fetch(p, opts).then(async r => {
-  if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(b.error ? b.error.message : r.statusText); }
-  return r.status === 204 ? null : r.json();
-});
-const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const human = n => { const u = ['B','KB','MB','GB','TB']; let i = 0; n = Number(n);
-  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; } return (i ? n.toFixed(2) : n) + ' ' + u[i]; };
-const pill = s => `<span class="pill ${esc(s)}">${esc(s)}</span>`;
-let selected = null;
+const api = async (path, options) => {
+  const response = await fetch(path, options);
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error ? body.error.message : `${response.status} ${response.statusText}`);
+  }
+  return response.status === 204 ? null : response.json();
+};
+const esc = value => String(value ?? "").replace(/[&<>"']/g, char =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+const human = value => {
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let size = Number(value) || 0, index = 0;
+  while (size >= 1024 && index < units.length - 1) { size /= 1024; index++; }
+  return `${index ? size.toFixed(2) : size} ${units[index]}`;
+};
+const pill = value => `<span class="pill ${esc(value)}">${esc(value)}</span>`;
+let selectedId = null;
+let selectedMetadata = null;
+let objects = [];
+let refreshRunning = false;
+let toastTimer;
+
+function notify(message, error = false) {
+  const toast = document.getElementById("toast");
+  toast.textContent = message;
+  toast.classList.toggle("error", error);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.textContent = ""; }, 5000);
+}
+
+function renderStats(cluster) {
+  const attention = cluster.under_replicated + cluster.unavailable + cluster.corrupt_replicas +
+    cluster.over_replicated + cluster.pending_deletes;
+  const stats = [
+    ["Objects", cluster.objects],
+    ["Data stored", human(cluster.stored_bytes)],
+    ["Chunks", cluster.chunks],
+    ["Chunk copies", cluster.replicas],
+    ["Fully replicated", cluster.fully_replicated],
+    ["Needs attention", attention]
+  ];
+  document.getElementById("stats").innerHTML = stats.map(([label, value], index) =>
+    `<div class="stat ${index === 5 && value ? "attention" : ""}"><div class="value">${esc(value)}</div><div class="label">${esc(label)}</div></div>`
+  ).join("");
+  const healthy = cluster.replication_healthy;
+  const label = document.getElementById("health-label");
+  label.className = `health-label ${healthy ? "" : "warn"}`;
+  label.innerHTML = `<span class="dot ${healthy ? "" : "offline"}"></span>${healthy ? "Replication healthy" : "Attention required"}`;
+  document.getElementById("rf-label").textContent = `Replication factor ${cluster.replication_factor} · ${human(cluster.chunk_size)} chunks`;
+  document.getElementById("controller-objects").textContent = `${cluster.objects} objects · ${cluster.chunks} chunks`;
+  document.getElementById("summary").textContent =
+    `${cluster.workers_up} of ${cluster.workers_total} workers online · ${cluster.writable ? "uploads enabled" : "uploads paused"} · ` +
+    `${cluster.replication_healthy ? "all chunks healthy" : `${cluster.under_replicated + cluster.unavailable} chunks need attention`}`;
+}
+
+function renderWorkers(cluster) {
+  const focusCounts = new Map();
+  for (const chunk of selectedMetadata?.chunks ?? []) {
+    for (const replica of chunk.replicas) focusCounts.set(replica.worker_id, (focusCounts.get(replica.worker_id) || 0) + 1);
+  }
+  document.getElementById("worker-flows").innerHTML = cluster.workers.map(worker => {
+    const usage = worker.capacity_bytes ? Math.min(100, worker.used_bytes / worker.capacity_bytes * 100) : 0;
+    const focus = focusCounts.get(worker.worker_id) || 0;
+    const isFocused = Boolean(selectedMetadata);
+    return `<div class="worker-flow ${esc(worker.status)}">
+      <div class="flow-line" aria-hidden="true"></div>
+      <div class="worker-node">
+        <div class="worker-id"><span class="status-dot ${esc(worker.status)}"></span>
+          <strong>${esc(worker.worker_id)}</strong>${pill(worker.status)}</div>
+        <div class="worker-metrics"><b>${esc(worker.replicas_recorded)}</b> recorded copies · <b>${esc(worker.chunk_count)}</b> files</div>
+        <div class="worker-metrics storage">Used ${esc(human(worker.used_bytes))}
+          <div class="storage-track" aria-label="${esc(human(worker.used_bytes))} storage used"><span style="width:${usage}%"></span></div>
+        </div>
+        <div class="worker-focus ${isFocused && !focus ? "empty" : ""}">${isFocused ? `${focus} selected-object copies` : `${Number(worker.seconds_since_heartbeat).toFixed(1)}s heartbeat`}</div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function renderObjects() {
+  const query = document.getElementById("object-search").value.trim().toLowerCase();
+  const visible = objects.filter(object =>
+    object.name.toLowerCase().includes(query) || object.object_id.toLowerCase().includes(query));
+  document.getElementById("objects").innerHTML = visible.map(object =>
+    `<tr>
+      <td><div class="object-name" title="${esc(object.name)}">${esc(object.name)}</div><div class="object-id mono" title="${esc(object.object_id)}">${esc(object.object_id)}</div></td>
+      <td>${esc(human(object.size))}</td><td>${esc(object.num_chunks)}</td>
+      <td>${pill(object.object_id === selectedId ? selectedMetadata?.replication_status || "loading" : "stored")}</td>
+      <td><div class="row-actions">
+        <button class="small" data-action="placement" data-id="${esc(object.object_id)}">Placement</button>
+        <a class="button small" href="/api/v1/objects/${encodeURIComponent(object.object_id)}">Download</a>
+        <button class="small danger" data-action="delete" data-id="${esc(object.object_id)}">Delete</button>
+      </div></td>
+    </tr>`).join("") || `<tr><td colspan="5" class="muted">${objects.length ? "No objects match this filter." : "No objects yet. Upload a file to see its chunks replicated across workers."}</td></tr>`;
+}
+
+function renderEvents(events) {
+  document.getElementById("event-count").textContent = `${events.length} ${events.length === 1 ? "event" : "events"}`;
+  document.getElementById("events").innerHTML = events.map(event => {
+    const time = new Date(event.time);
+    const timeText = Number.isNaN(time.getTime()) ? "" : time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const details = Object.keys(event.details || {}).length
+      ? `<details class="event-details"><summary>Event details</summary><pre>${esc(JSON.stringify(event.details, null, 2))}</pre></details>`
+      : "";
+    return `<article class="event ${esc(event.level)}">
+      <time class="event-time" datetime="${esc(event.time)}">${esc(timeText)}</time>
+      <div><div class="event-type">${esc(event.type)}</div><div class="event-message">${esc(event.message)}</div>${details}</div>
+    </article>`;
+  }).join("") || `<div class="event-empty">No activity yet. Upload an object or run a scrub to start the event stream.</div>`;
+}
+
+async function showPlacement(id) {
+  selectedId = id;
+  selectedMetadata = null;
+  renderObjects();
+  try {
+    selectedMetadata = await api(`/api/v1/objects/${encodeURIComponent(id)}/metadata`);
+    const metadata = selectedMetadata;
+    const chunks = metadata.chunks || [];
+    const rows = chunks.map(chunk => {
+      const replicas = chunk.replicas.map(replica =>
+        `<span class="copy-worker">${esc(replica.worker_id)} ${pill(replica.available ? "healthy" : replica.status === "corrupt" ? "corrupt" : replica.worker_status)}</span>`
+      ).join("");
+      return `<tr><td>${esc(chunk.index)}</td><td class="mono">${esc(chunk.chunk_id)}</td><td>${esc(human(chunk.size))}</td>
+        <td class="mono">${esc(chunk.checksum.slice(0, 14))}…</td><td>${esc(chunk.healthy_replicas)}/${esc(metadata.replication_factor)}</td>
+        <td class="copy-cell">${replicas || "No copies recorded"}</td></tr>`;
+    }).join("");
+    document.getElementById("placement").innerHTML = `
+      <div class="placement-heading"><h4>${esc(metadata.name)} · ${pill(metadata.replication_status)}</h4><button class="small" data-action="close-placement">Close</button></div>
+      <div class="placement-meta">Object SHA-256 ${esc(metadata.checksum)}<br>Custom metadata ${esc(JSON.stringify(metadata.custom_metadata))} · version ${esc(metadata.metadata_version)}</div>
+      <div class="table-wrap"><table><thead><tr><th>Chunk</th><th>Chunk ID</th><th>Size</th><th>SHA-256</th><th>Healthy / RF</th><th>Replica locations</th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="6">No chunk placement available.</td></tr>`}</tbody></table></div>`;
+    renderObjects();
+    return metadata;
+  } catch (error) {
+    selectedId = null;
+    selectedMetadata = null;
+    document.getElementById("placement").innerHTML = "";
+    renderObjects();
+    notify(error.message, true);
+    return null;
+  }
+}
 
 async function refresh() {
+  if (refreshRunning) return;
+  refreshRunning = true;
   try {
-    const [c, objs, events] = await Promise.all([api('/api/v1/cluster'), api('/api/v1/objects?limit=200'), api('/api/v1/events?limit=60')]);
-    document.getElementById('summary').textContent =
-      `RF=${c.replication_factor} · chunk ${human(c.chunk_size)} · ${c.workers_up}/${c.workers_total} workers UP · ` +
-      (c.replication_healthy ? 'replication healthy' : 'replication NOT healthy');
-    const stats = [['Objects', c.objects], ['Stored', human(c.stored_bytes)], ['Chunks', c.chunks], ['Copies', c.replicas],
-      ['Fully replicated', c.fully_replicated], ['Under-replicated', c.under_replicated], ['Unavailable', c.unavailable],
-      ['Over-replicated', c.over_replicated], ['Corrupt copies', c.corrupt_replicas], ['Pending deletes', c.pending_deletes]];
-    document.getElementById('stats').innerHTML = stats.map(([k, v]) => `<div class="stat"><div class="v">${esc(v)}</div><div class="k">${k}</div></div>`).join('');
-    document.getElementById('workers').innerHTML = c.workers.map(w =>
-      `<tr><td class="mono">${esc(w.worker_id)}</td><td>${pill(w.status)}</td><td>${w.seconds_since_heartbeat}s ago</td>` +
-      `<td>${w.replicas_recorded}</td><td>${human(w.used_bytes)}</td></tr>`).join('');
-    document.getElementById('events').innerHTML = events.map(e =>
-      `<tr><td class="mono muted">${esc(e.time.slice(11, 19))}</td><td class="lvl-${esc(e.level)}">${esc(e.type)}</td><td>${esc(e.message)}</td></tr>`).join('');
-    document.getElementById('objects').innerHTML = objs.objects.map(o =>
-      `<tr><td>${esc(o.name)}</td><td class="mono">${esc(o.object_id)}</td><td>${human(o.size)}</td><td>${esc(o.content_type)}</td>` +
-      `<td>${o.num_chunks}</td><td class="muted">${esc(o.created_at.slice(0, 19))}</td>` +
-      `<td><button class="secondary" onclick="show('${o.object_id}')">Placement</button> ` +
-      `<a href="/api/v1/objects/${o.object_id}"><button class="secondary">Download</button></a> ` +
-      `<button class="danger" onclick="del('${o.object_id}')">Delete</button></td></tr>`).join('') ||
-      '<tr><td colspan="7" class="muted">No objects yet — upload one above.</td></tr>';
-    if (selected) await show(selected, true);
-  } catch (e) { document.getElementById('summary').textContent = 'error: ' + e.message; }
+    const [cluster, objectPage, events] = await Promise.all([
+      api("/api/v1/cluster"),
+      api("/api/v1/objects?limit=200"),
+      api("/api/v1/events?limit=40")
+    ]);
+    objects = objectPage.objects;
+    if (selectedId && objects.some(object => object.object_id === selectedId)) {
+      try { selectedMetadata = await api(`/api/v1/objects/${encodeURIComponent(selectedId)}/metadata`); }
+      catch { selectedId = null; selectedMetadata = null; }
+    } else {
+      selectedId = null;
+      selectedMetadata = null;
+    }
+    renderStats(cluster);
+    renderWorkers(cluster);
+    renderObjects();
+    renderEvents(events);
+    document.getElementById("live-dot").classList.remove("offline");
+    document.getElementById("live-text").textContent = "Live";
+    document.getElementById("updated-at").textContent = `Updated ${new Date().toLocaleTimeString()}`;
+    if (selectedId) await showPlacement(selectedId);
+  } catch (error) {
+    document.getElementById("live-dot").classList.add("offline");
+    document.getElementById("live-text").textContent = "Disconnected";
+    document.getElementById("summary").textContent = `Controller unavailable: ${error.message}`;
+  } finally {
+    refreshRunning = false;
+  }
 }
 
-async function show(id, quiet) {
-  selected = id;
+async function admin(action, button) {
+  button.disabled = true;
+  const original = button.textContent;
+  button.textContent = action === "scrub" ? "Scrubbing…" : "Repairing…";
   try {
-    const m = await api(`/api/v1/objects/${id}/metadata`);
-    const rows = m.chunks.map(ch => `<tr><td>${ch.index}</td><td class="mono">${esc(ch.chunk_id)}</td><td>${human(ch.size)}</td>` +
-      `<td class="mono">${ch.checksum.slice(0, 16)}…</td><td>${ch.healthy_replicas}/${m.replication_factor}</td><td>` +
-      ch.replicas.map(r => `<span class="mono">${esc(r.worker_id)}</span> ${pill(r.available ? 'healthy' : (r.status === 'corrupt' ? 'corrupt' : r.worker_status))}`).join(' &nbsp; ') +
-      `</td></tr>`).join('');
-    document.getElementById('placement').innerHTML =
-      `<h2>${esc(m.name)} — ${pill(m.replication_status)} <button class="secondary" onclick="selected=null;this.closest('div').innerHTML=''">close</button></h2>` +
-      `<p class="muted mono">sha256 ${esc(m.checksum)} · custom metadata ${esc(JSON.stringify(m.custom_metadata))} (v${m.metadata_version})</p>` +
-      `<table><thead><tr><th>#</th><th>Chunk</th><th>Size</th><th>SHA-256</th><th>Copies</th><th>Workers</th></tr></thead><tbody>${rows}</tbody></table>`;
-  } catch (e) { selected = null; if (!quiet) alert(e.message); document.getElementById('placement').innerHTML = ''; }
+    const result = await api(`/api/v1/admin/${action}`, { method: "POST" });
+    const scrubWorkers = result.workers || [];
+    const checked = scrubWorkers.reduce((total, worker) => total + (worker.checked || 0), 0);
+    const corrupt = scrubWorkers.reduce((total, worker) => total + (worker.corrupt || 0), 0);
+    const summary = action === "scrub"
+      ? `Scrub complete · ${checked} chunks checked · ${corrupt} corrupt`
+      : "Repair round complete";
+    notify(summary);
+    await refresh();
+  } catch (error) {
+    notify(error.message, true);
+  } finally {
+    button.disabled = false;
+    button.textContent = original;
+  }
 }
 
-async function del(id) {
-  if (!confirm('Delete object ' + id + '?')) return;
-  try { await api(`/api/v1/objects/${id}`, {method: 'DELETE'}); if (selected === id) selected = null; refresh(); }
-  catch (e) { alert(e.message); }
-}
-
-async function admin(action) {
-  try { const r = await api(`/api/v1/admin/${action}`, {method: 'POST'}); console.log(action, r); refresh(); }
-  catch (e) { alert(e.message); }
-}
-
-document.getElementById('upload').addEventListener('submit', async ev => {
-  ev.preventDefault();
-  const form = new FormData(ev.target);
-  if (!form.get('metadata')) form.delete('metadata');
-  const status = document.getElementById('upload-status');
-  status.textContent = 'uploading…';
-  try { const m = await api('/api/v1/objects', {method: 'POST', body: form}); status.textContent = 'stored ' + m.object_id; ev.target.reset(); show(m.object_id); refresh(); }
-  catch (e) { status.textContent = 'error: ' + e.message; }
+document.getElementById("refresh-button").addEventListener("click", refresh);
+document.getElementById("scrub-button").addEventListener("click", event => admin("scrub", event.currentTarget));
+document.getElementById("repair-button").addEventListener("click", event => admin("repair", event.currentTarget));
+document.getElementById("object-search").addEventListener("input", renderObjects);
+document.getElementById("objects").addEventListener("click", async event => {
+  const button = event.target.closest("button[data-action]");
+  if (!button) return;
+  const { action, id } = button.dataset;
+  if (action === "placement") await showPlacement(id);
+  if (action === "delete") {
+    if (!confirm(`Delete object ${id}? Its chunk copies will also be removed.`)) return;
+    button.disabled = true;
+    try {
+      await api(`/api/v1/objects/${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (selectedId === id) {
+        selectedId = null;
+        selectedMetadata = null;
+        document.getElementById("placement").innerHTML = "";
+      }
+      notify("Object deleted.");
+      await refresh();
+    } catch (error) { notify(error.message, true); button.disabled = false; }
+  }
+});
+document.getElementById("placement").addEventListener("click", event => {
+  if (!event.target.closest('[data-action="close-placement"]')) return;
+  selectedId = null;
+  selectedMetadata = null;
+  document.getElementById("placement").innerHTML = "";
+  renderObjects();
+  refresh();
+});
+document.getElementById("upload").addEventListener("submit", async event => {
+  event.preventDefault();
+  const uploadForm = event.currentTarget;
+  const form = new FormData(uploadForm);
+  const metadataText = String(form.get("metadata") || "").trim();
+  if (metadataText) {
+    let metadata;
+    try {
+      metadata = JSON.parse(metadataText);
+    } catch {
+      document.getElementById("upload-status").textContent = "Metadata must be valid JSON.";
+      return;
+    }
+    if (!metadata || Array.isArray(metadata) || typeof metadata !== "object") {
+      document.getElementById("upload-status").textContent = "Metadata must be a JSON object.";
+      return;
+    }
+    form.set("metadata", JSON.stringify(metadata));
+  } else form.delete("metadata");
+  const submit = uploadForm.querySelector('button[type="submit"]');
+  const status = document.getElementById("upload-status");
+  submit.disabled = true;
+  status.textContent = "Uploading and replicating chunks…";
+  try {
+    const metadata = await api("/api/v1/objects", { method: "POST", body: form });
+    status.textContent = `Stored ${metadata.object_id}`;
+    uploadForm.reset();
+    await refresh();
+    await showPlacement(metadata.object_id);
+    notify("Upload complete · chunk copies are placed on separate workers.");
+  } catch (error) {
+    status.textContent = `Upload failed: ${error.message}`;
+  } finally { submit.disabled = false; }
 });
 
 refresh();
