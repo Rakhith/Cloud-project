@@ -402,7 +402,7 @@ async function showPlacement(id) {
     }).join("");
     document.getElementById("placement").innerHTML = `
       <div class="placement-heading"><h4>${esc(metadata.name)} · ${pill(metadata.replication_status)}</h4><button class="small" data-action="close-placement">Close</button></div>
-      <div class="placement-meta">Object SHA-256 ${esc(metadata.checksum)}<br>Custom metadata ${esc(JSON.stringify(metadata.custom_metadata))} · version ${esc(metadata.metadata_version)}</div>
+      <div class="placement-meta">Object ID <span class="mono">${esc(metadata.object_id)}</span><br>Object SHA-256 ${esc(metadata.checksum)}<br>Custom metadata ${esc(JSON.stringify(metadata.custom_metadata))} · version ${esc(metadata.metadata_version)}</div>
       <div class="table-wrap"><table><thead><tr><th>Chunk</th><th>Chunk ID</th><th>Size</th><th>SHA-256</th><th>Healthy / RF</th><th>Replica locations</th></tr></thead>
       <tbody>${rows || `<tr><td colspan="6">No chunk placement available.</td></tr>`}</tbody></table></div>`;
     renderObjects();
